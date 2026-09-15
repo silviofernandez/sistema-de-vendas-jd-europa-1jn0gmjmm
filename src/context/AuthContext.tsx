@@ -2,35 +2,55 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 import type { RecordModel } from 'pocketbase'
 import pb from '@/lib/pocketbase/client'
 
+import type { UserRecord } from '@/types/database'
+
 interface AuthContextType {
-  user: RecordModel | null
+  user: UserRecord | null
   token: string
   isAuthenticated: boolean
+  isMaster: boolean
   isLoading: boolean
   login: (email: string, pass: string) => Promise<void>
   logout: () => void
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<RecordModel | null>(pb.authStore.record)
+  const [user, setUser] = useState<UserRecord | null>(
+    (pb.authStore.record as unknown as UserRecord) || null,
+  )
   const [token, setToken] = useState<string>(pb.authStore.token)
   const [isLoading, setIsLoading] = useState<boolean>(true)
+
+  const refreshUser = async () => {
+    try {
+      if (pb.authStore.isValid && pb.authStore.record?.id) {
+        const fresh = await pb.collection('users').getOne<UserRecord>(pb.authStore.record.id)
+        setUser(fresh)
+      }
+    } catch {
+      // Falha silenciosa ao atualizar
+    }
+  }
 
   useEffect(() => {
     // Escuta mudanças no authStore do PocketBase
     const unsubscribe = pb.authStore.onChange((newToken, newModel) => {
       setToken(newToken)
-      setUser(newModel)
+      setUser((newModel as unknown as UserRecord) || null)
     })
 
     // Valida token ao inicializar se existir
     if (pb.authStore.isValid) {
-      setUser(pb.authStore.record)
+      setUser((pb.authStore.record as unknown as UserRecord) || null)
       setToken(pb.authStore.token)
+      // Faz refresh para garantir que role e campos novos estejam no state
+      refreshUser().finally(() => setIsLoading(false))
+    } else {
+      setIsLoading(false)
     }
-    setIsLoading(false)
 
     return () => {
       unsubscribe()
@@ -39,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, pass: string) => {
     const authData = await pb.collection('users').authWithPassword(email, pass)
-    setUser(authData.record)
+    setUser(authData.record as unknown as UserRecord)
     setToken(authData.token)
   }
 
@@ -49,15 +69,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken('')
   }
 
+  const isMaster = user?.role === 'master' || user?.email === 'gabsilvio@gmail.com'
+
   return (
     <AuthContext.Provider
       value={{
         user,
         token,
         isAuthenticated: !!token && !!user,
+        isMaster,
         isLoading,
         login,
         logout,
+        refreshUser,
       }}
     >
       {children}

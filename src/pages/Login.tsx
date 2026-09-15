@@ -113,7 +113,7 @@ export default function Login() {
 
         {/* Dica do usuário de teste */}
         <div className="mt-8 pt-6 border-t border-[#E6DFD6] text-center text-xs text-[#6E675F]">
-          <p className="font-medium text-[#2E2A25] mb-1">Acesso do Corretor:</p>
+          <p className="font-medium text-[#2E2A25] mb-1">Acesso Rápido Master / Gestor:</p>
           <p>
             E-mail:{' '}
             <code className="bg-[#FAF7F2] px-1.5 py-0.5 rounded text-[#C2501A] font-mono">
@@ -125,6 +125,9 @@ export default function Login() {
             <code className="bg-[#FAF7F2] px-1.5 py-0.5 rounded text-[#C2501A] font-mono">
               Skip@Pass
             </code>
+          </p>
+          <p className="mt-2 text-[11px] text-[#6E675F]">
+            Corretores utilizam o e-mail e senha enviados pelo Master via WhatsApp.
           </p>
         </div>
       </div>

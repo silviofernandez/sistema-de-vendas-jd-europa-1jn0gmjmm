@@ -14,6 +14,7 @@ import Login from '@/pages/Login'
 import Simulador from '@/pages/Simulador'
 import Lotes from '@/pages/Lotes'
 import Clientes from '@/pages/Clientes'
+import Corretores from '@/pages/Corretores'
 import Configuracoes from '@/pages/Configuracoes'
 import NotFound from '@/pages/NotFound'
 
@@ -56,9 +57,17 @@ const App = () => (
                 }
               />
               <Route
+                path="/corretores"
+                element={
+                  <ProtectedRoute masterOnly>
+                    <Corretores />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/configuracoes"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute masterOnly>
                     <Configuracoes />
                   </ProtectedRoute>
                 }

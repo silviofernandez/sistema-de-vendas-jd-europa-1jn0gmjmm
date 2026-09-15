@@ -12,12 +12,15 @@ import {
   ChevronRight,
   User,
   Calendar,
+  Share2,
 } from 'lucide-react'
 import { clientesService } from '@/services/clientes'
 import { propostasService } from '@/services/propostas'
 import { useRealtime } from '@/hooks/use-realtime'
+import { useAuth } from '@/context/AuthContext'
 import type { ClienteRecord, PropostaRecord } from '@/types/database'
 import { formatarMoeda, formatarNumero } from '@/lib/calculo'
+import { gerarMensagemPropostaWhatsApp, abrirWhatsApp } from '@/lib/whatsapp'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -32,6 +35,7 @@ import {
 import { useToast } from '@/hooks/use-toast'
 
 export default function Clientes() {
+  const { user } = useAuth()
   const { toast } = useToast()
 
   const [clientes, setClientes] = useState<ClienteRecord[]>([])
@@ -400,6 +404,35 @@ export default function Clientes() {
                     <span className="font-bold text-[#2E2A25]">
                       Total financiado: {formatarMoeda(prop.parcela_mensal * prop.num_parcelas)}
                     </span>
+                  </div>
+
+                  <div className="pt-2 flex justify-end">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        const tel = viewingCliente.telefone || ''
+                        const msg = gerarMensagemPropostaWhatsApp({
+                          clienteNome: viewingCliente.nome,
+                          quadra: prop.quadra,
+                          modoArea: 'area_total',
+                          areaM2: prop.area_m2,
+                          valorM2: prop.valor_m2,
+                          valorTotalLote: prop.valor_total_lote,
+                          entrada: prop.entrada,
+                          valorFinanciado: prop.valor_financiado,
+                          numParcelas: prop.num_parcelas,
+                          parcelaMensal: prop.parcela_mensal,
+                          ipcaAnual: prop.ipca_anual,
+                          corretorNome: user?.name,
+                        })
+                        abrirWhatsApp(tel, msg)
+                      }}
+                      className="h-8 px-3 text-xs bg-[#25D366] hover:bg-[#20ba59] text-white flex items-center gap-1.5 rounded-lg"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                      Enviar no WhatsApp
+                    </Button>
                   </div>
                 </div>
               ))}

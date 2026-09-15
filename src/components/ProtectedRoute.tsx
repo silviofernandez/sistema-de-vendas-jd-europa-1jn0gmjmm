@@ -4,10 +4,11 @@ import { useAuth } from '@/context/AuthContext'
 
 interface ProtectedRouteProps {
   children: React.ReactNode
+  masterOnly?: boolean
 }
 
-export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading } = useAuth()
+export default function ProtectedRoute({ children, masterOnly = false }: ProtectedRouteProps) {
+  const { isAuthenticated, isMaster, isLoading } = useAuth()
 
   if (isLoading) {
     return (
@@ -19,6 +20,10 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />
+  }
+
+  if (masterOnly && !isMaster) {
+    return <Navigate to="/simulador" replace />
   }
 
   return <>{children}</>

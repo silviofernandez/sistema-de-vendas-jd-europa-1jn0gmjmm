@@ -13,8 +13,17 @@ import {
   DollarSign,
   Maximize2,
   User,
+  Share2,
+  Phone,
 } from 'lucide-react'
 import { useConfig } from '@/context/ConfigContext'
+import { useAuth } from '@/context/AuthContext'
+import {
+  gerarMensagemPropostaWhatsApp,
+  abrirWhatsApp,
+  aplicarMascaraTelefone,
+  formatarNumeroWhatsapp,
+} from '@/lib/whatsapp'
 import { lotesService } from '@/services/lotes'
 import { clientesService } from '@/services/clientes'
 import { propostasService } from '@/services/propostas'
@@ -44,8 +53,19 @@ import { useToast } from '@/hooks/use-toast'
 
 export default function Simulador() {
   const { config } = useConfig()
+  const { user } = useAuth()
   const { toast } = useToast()
   const resultsRef = useRef<HTMLDivElement>(null)
+
+  // Modal WhatsApp de Proposta
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false)
+  const [whatsAppTelefone, setWhatsAppTelefone] = useState(() => {
+    try {
+      return localStorage.getItem('last_whatsapp_tel') || ''
+    } catch {
+      return ''
+    }
+  })
 
   // Modo de entrada da área: 'dimensoes' (Frente x Lateral) ou 'area_total' (Área total direta)
   const [modoArea, setModoArea] = useState<'dimensoes' | 'area_total'>(() => {
@@ -225,6 +245,74 @@ export default function Simulador() {
   // Imprimir Proposta
   const handleImprimir = () => {
     window.print()
+  }
+
+  // Abrir Modal de Envio por WhatsApp
+  const handleOpenWhatsApp = () => {
+    if (!isEntradaValida || !isParcelasValida || !isAreaValida) {
+      toast({
+        variant: 'destructive',
+        title: 'Verifique os dados',
+        description:
+          modoArea === 'area_total'
+            ? 'Preencha valores válidos de entrada, área total e parcelas antes de enviar a proposta.'
+            : 'Preencha valores válidos de entrada, dimensões e parcelas antes de enviar a proposta.',
+      })
+      return
+    }
+
+    // Se houver cliente selecionado com telefone, preenche automaticamente
+    const clienteObj = clientes.find((c) => c.id === selectedClienteId)
+    if (clienteObj?.telefone) {
+      setWhatsAppTelefone(clienteObj.telefone)
+    }
+    setIsWhatsAppModalOpen(true)
+  }
+
+  // Confirmar e Enviar Proposta por WhatsApp
+  const handleConfirmEnviarWhatsApp = () => {
+    const rawDigits = formatarNumeroWhatsapp(whatsAppTelefone)
+    if (!rawDigits || rawDigits.length < 10) {
+      toast({
+        variant: 'destructive',
+        title: 'Telefone inválido',
+        description: 'Digite o telefone do cliente com DDD (ex: 11 99999-9999).',
+      })
+      return
+    }
+
+    // Grava último telefone no localStorage
+    try {
+      localStorage.setItem('last_whatsapp_tel', whatsAppTelefone)
+    } catch {
+      /* intentionally ignored */
+    }
+
+    const clienteObj = clientes.find((c) => c.id === selectedClienteId)
+    const msg = gerarMensagemPropostaWhatsApp({
+      clienteNome: clienteObj?.nome,
+      quadra,
+      loteIdentificador,
+      modoArea,
+      largura,
+      comprimento,
+      areaM2: simulacao.areaM2,
+      valorM2,
+      valorTotalLote: simulacao.valorTotalLote,
+      entrada: simulacao.entrada,
+      valorFinanciado: simulacao.valorFinanciado,
+      numParcelas: simulacao.numParcelas,
+      parcelaMensal: simulacao.parcelaMensal,
+      ipcaAnual: simulacao.ipcaAnual,
+      corretorNome: user?.name,
+    })
+
+    abrirWhatsApp(whatsAppTelefone, msg)
+    setIsWhatsAppModalOpen(false)
+    toast({
+      title: 'WhatsApp aberto com sucesso!',
+      description: 'A proposta formatada foi encaminhada para a conversa.',
+    })
   }
 
   // Abrir Modal de Salvar
@@ -920,8 +1008,17 @@ export default function Simulador() {
             </div>
           </div>
 
-          {/* Ações: Imprimir Proposta e Salvar Proposta */}
-          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+          {/* Ações: WhatsApp, Imprimir Proposta e Salvar Proposta */}
+          <div className="flex flex-col sm:flex-row gap-2.5 pt-2">
+            <Button
+              type="button"
+              onClick={handleOpenWhatsApp}
+              className="flex-1 h-11 bg-[#25D366] hover:bg-[#20ba59] text-white font-semibold text-sm rounded-xl shadow-sm hover-lift flex items-center justify-center gap-2"
+            >
+              <Share2 className="w-4 h-4" />
+              Enviar no WhatsApp
+            </Button>
+
             <Button
               type="button"
               variant="outline"
@@ -929,7 +1026,7 @@ export default function Simulador() {
               className="flex-1 h-11 border-[#E6DFD6] bg-white hover:bg-[#FAF7F2] text-[#2E2A25] font-semibold text-sm rounded-xl hover-lift flex items-center justify-center gap-2"
             >
               <Printer className="w-4 h-4 text-[#6E675F]" />
-              Imprimir Proposta
+              Imprimir
             </Button>
 
             <Button
@@ -938,11 +1035,121 @@ export default function Simulador() {
               className="flex-1 h-11 bg-[#4A7C59] hover:bg-[#3d6749] text-white font-semibold text-sm rounded-xl shadow-sm hover-lift flex items-center justify-center gap-2"
             >
               <Save className="w-4 h-4" />
-              Salvar Proposta
+              Salvar
             </Button>
           </div>
         </div>
       </div>
+
+      {/* Modal para Envio de Proposta por WhatsApp */}
+      <Dialog open={isWhatsAppModalOpen} onOpenChange={setIsWhatsAppModalOpen}>
+        <DialogContent className="max-w-md bg-white border-[#E6DFD6]">
+          <DialogHeader>
+            <DialogTitle className="text-base sm:text-lg font-bold text-[#2E2A25] flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-[#25D366]/10 text-[#25D366] flex items-center justify-center">
+                <Share2 className="w-4 h-4" />
+              </div>
+              Enviar Proposta no WhatsApp
+            </DialogTitle>
+            <DialogDescription className="text-xs text-[#6E675F]">
+              A proposta será montada com formato profissional, pronta para o cliente visualizar no
+              WhatsApp.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Resumo do que será enviado */}
+            <div className="p-3.5 bg-[#FAF7F2] rounded-xl border border-[#E6DFD6] space-y-1.5 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-[#6E675F]">Imóvel:</span>
+                <span className="font-bold text-[#2E2A25]">
+                  Quadra {quadra} {loteIdentificador ? `• ${loteIdentificador}` : ''}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[#6E675F]">Metragem:</span>
+                <span className="font-semibold text-[#2E2A25]">
+                  {modoArea === 'dimensoes'
+                    ? `${formatarNumero(largura, 1)}m × ${formatarNumero(comprimento, 1)}m (${formatarNumero(simulacao.areaM2)} m²)`
+                    : `${formatarNumero(simulacao.areaM2)} m² (Área Total)`}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[#6E675F]">Valor do m²:</span>
+                <span className="font-semibold text-[#2E2A25]">{formatarMoeda(valorM2)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[#6E675F]">Valor Total do Lote:</span>
+                <span className="font-bold text-[#2E2A25]">
+                  {formatarMoeda(simulacao.valorTotalLote)}
+                </span>
+              </div>
+              <div className="border-t border-[#E6DFD6] pt-1.5 flex justify-between items-center">
+                <span className="text-[#6E675F]">Entrada:</span>
+                <span className="font-bold text-[#4A7C59]">{formatarMoeda(simulacao.entrada)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[#6E675F]">Parcelas:</span>
+                <span className="font-bold text-[#C2501A]">
+                  {simulacao.numParcelas}x de {formatarMoeda(simulacao.parcelaMensal)}
+                </span>
+              </div>
+              {clienteSelecionadoObj && (
+                <div className="border-t border-[#E6DFD6] pt-1.5 flex justify-between items-center">
+                  <span className="text-[#6E675F]">Cliente destinatário:</span>
+                  <span className="font-bold text-[#2E2A25]">{clienteSelecionadoObj.nome}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Input do WhatsApp com máscara */}
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="whatsAppTelefone"
+                className="text-xs font-semibold text-[#2E2A25] flex items-center justify-between"
+              >
+                <span>WhatsApp do Cliente (com DDD)</span>
+                <span className="text-[11px] text-[#6E675F] font-normal">Ex: (11) 99999-9999</span>
+              </Label>
+              <div className="relative">
+                <Phone className="w-4 h-4 text-[#6E675F] absolute left-3 top-1/2 -translate-y-1/2" />
+                <Input
+                  id="whatsAppTelefone"
+                  type="tel"
+                  placeholder="(11) 98765-4321"
+                  value={whatsAppTelefone}
+                  onChange={(e) => setWhatsAppTelefone(aplicarMascaraTelefone(e.target.value))}
+                  className="pl-9 h-11 border-[#E6DFD6] font-medium"
+                  autoFocus
+                />
+              </div>
+              <p className="text-[11px] text-[#6E675F]">
+                O sistema abrirá a conversa com a mensagem 100% pronta com entrada, metragem e valor
+                de cada parcela.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsWhatsAppModalOpen(false)}
+              className="border-[#E6DFD6]"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirmEnviarWhatsApp}
+              className="bg-[#25D366] hover:bg-[#20ba59] text-white flex items-center gap-1.5"
+            >
+              <Share2 className="w-4 h-4" />
+              Abrir no WhatsApp
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal para Vincular Cliente e Salvar Proposta */}
       <Dialog open={isSaveModalOpen} onOpenChange={setIsSaveModalOpen}>

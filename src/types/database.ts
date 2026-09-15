@@ -21,6 +21,16 @@ export interface LoteRecord extends RecordModel {
   comprimento: number
 }
 
+export type UserRole = 'master' | 'corretor'
+
+export interface UserRecord extends RecordModel {
+  name: string
+  email: string
+  role?: UserRole
+  telefone?: string
+  avatar?: string
+}
+
 export interface ClienteRecord extends RecordModel {
   nome: string
   telefone?: string

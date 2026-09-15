@@ -1,19 +1,34 @@
 import { useLocation, Link, useNavigate, Outlet } from 'react-router-dom'
-import { Calculator, Grid, Users, Settings, LogOut, MapPin, Trees } from 'lucide-react'
+import {
+  Calculator,
+  Grid,
+  Users,
+  Settings,
+  LogOut,
+  MapPin,
+  Trees,
+  UserCheck,
+  Shield,
+} from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
-
-const NAV_ITEMS = [
-  { path: '/simulador', label: 'Simulador', icon: Calculator },
-  { path: '/lotes', label: 'Lotes', icon: Grid },
-  { path: '/cliente', label: 'Clientes', icon: Users },
-  { path: '/configuracoes', label: 'Configurações', icon: Settings },
-]
 
 export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, logout, isAuthenticated } = useAuth()
+  const { user, logout, isAuthenticated, isMaster } = useAuth()
+
+  const navItems = [
+    { path: '/simulador', label: 'Simulador', icon: Calculator, masterOnly: false },
+    { path: '/lotes', label: 'Lotes', icon: Grid, masterOnly: false },
+    { path: '/cliente', label: 'Clientes', icon: Users, masterOnly: false },
+    ...(isMaster
+      ? [
+          { path: '/corretores', label: 'Corretores', icon: UserCheck, masterOnly: true },
+          { path: '/configuracoes', label: 'Configurações', icon: Settings, masterOnly: true },
+        ]
+      : []),
+  ]
 
   // Se for a rota de login, não mostra sidebar nem header
   if (location.pathname === '/login' || !isAuthenticated) {
@@ -33,6 +48,8 @@ export default function Layout() {
         return 'Gerenciamento de Lotes'
       case '/cliente':
         return 'Cadastro de Clientes'
+      case '/corretores':
+        return 'Gestão de Corretores'
       case '/configuracoes':
         return 'Configurações de Venda'
       default:
@@ -59,7 +76,7 @@ export default function Layout() {
 
         {/* Links de navegação */}
         <nav className="flex-1 py-4 px-2 space-y-1">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const Icon = item.icon
             const isActive = location.pathname === item.path
             return (
@@ -85,13 +102,22 @@ export default function Layout() {
         {/* Rodapé da sidebar com usuário e logout */}
         <div className="p-3 border-t border-[#E6DFD6]">
           <div className="flex items-center gap-2 p-2 rounded-lg bg-[#FAF7F2] mb-2 justify-center lg:justify-start">
-            <div className="w-8 h-8 rounded-full bg-[#4A7C59] text-white flex items-center justify-center font-semibold text-xs shrink-0">
-              {user?.name ? user.name.charAt(0).toUpperCase() : 'C'}
+            <div
+              className={`w-8 h-8 rounded-full ${isMaster ? 'bg-[#C2501A]' : 'bg-[#4A7C59]'} text-white flex items-center justify-center font-semibold text-xs shrink-0`}
+            >
+              {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
             </div>
             <div className="hidden lg:block min-w-0 flex-1">
-              <p className="text-xs font-semibold text-[#2E2A25] truncate">
-                {user?.name || 'Corretor'}
-              </p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-xs font-semibold text-[#2E2A25] truncate">
+                  {user?.name || (isMaster ? 'Master' : 'Corretor')}
+                </p>
+                {isMaster && (
+                  <span className="text-[10px] bg-orange-100 text-[#C2501A] px-1.5 py-0.2 rounded font-bold uppercase shrink-0">
+                    Master
+                  </span>
+                )}
+              </div>
               <p className="text-[11px] text-[#6E675F] truncate">
                 {user?.email || 'gabsilvio@gmail.com'}
               </p>
@@ -130,11 +156,17 @@ export default function Layout() {
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex items-center gap-2 text-right">
               <span className="text-xs font-medium text-[#2E2A25]">
-                {user?.name || 'Silvio Corretor'}
+                {user?.name || (isMaster ? 'Silvio (Master)' : 'Corretor')}
               </span>
-              <span className="text-[10px] bg-[#4A7C59]/10 text-[#4A7C59] px-2 py-0.5 rounded-full font-semibold">
-                Online
-              </span>
+              {isMaster ? (
+                <span className="text-[10px] bg-[#C2501A]/10 text-[#C2501A] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                  <Shield className="w-3 h-3" /> Master
+                </span>
+              ) : (
+                <span className="text-[10px] bg-[#4A7C59]/10 text-[#4A7C59] px-2 py-0.5 rounded-full font-semibold">
+                  Corretor
+                </span>
+              )}
             </div>
             <Button
               variant="outline"
@@ -156,7 +188,7 @@ export default function Layout() {
 
       {/* Bottom Tab Bar Mobile (< 768px) */}
       <nav className="no-print md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-[#E6DFD6] z-40 flex items-center justify-around h-16 px-1 safe-bottom">
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const Icon = item.icon
           const isActive = location.pathname === item.path
           return (
@@ -172,7 +204,7 @@ export default function Layout() {
               )}
               <Icon className="w-5 h-5 mb-0.5" />
               <span
-                className={`text-[10px] font-medium leading-tight ${isActive ? 'font-bold' : ''}`}
+                className={`text-[9px] font-medium leading-tight ${isActive ? 'font-bold' : ''}`}
               >
                 {item.label}
               </span>
