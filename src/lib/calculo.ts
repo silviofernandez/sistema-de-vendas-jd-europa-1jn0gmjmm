@@ -69,15 +69,19 @@ export function calcularFatorCorrecao(
  * - Total financiado = parcela mensal * num_parcelas
  */
 export function calcularFinanciamento(params: {
-  largura: number
-  comprimento: number
+  largura?: number
+  comprimento?: number
+  areaM2?: number
   valorM2: number
   entrada: number
   numParcelas: number
   fatores: { fator_24: number; fator_36: number; fator_48: number }
   ipcaAnual: number
 }) {
-  const areaM2 = Math.round(params.largura * params.comprimento * 100) / 100
+  const areaM2 =
+    params.areaM2 !== undefined
+      ? Math.round(params.areaM2 * 100) / 100
+      : Math.round((params.largura ?? 0) * (params.comprimento ?? 0) * 100) / 100
   const valorTotalLote = Math.round(areaM2 * params.valorM2 * 100) / 100
   const valorFinanciado = Math.max(0, Math.round((valorTotalLote - params.entrada) * 100) / 100)
   const fatorAplicado = calcularFatorCorrecao(params.numParcelas, params.fatores)

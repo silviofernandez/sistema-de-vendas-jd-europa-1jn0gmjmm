@@ -47,11 +47,31 @@ export default function Simulador() {
   const { toast } = useToast()
   const resultsRef = useRef<HTMLDivElement>(null)
 
+  // Modo de entrada da área: 'dimensoes' (Frente x Lateral) ou 'area_total' (Área total direta)
+  const [modoArea, setModoArea] = useState<'dimensoes' | 'area_total'>(() => {
+    try {
+      const salvo = sessionStorage.getItem('simulador_modo_area')
+      return salvo === 'area_total' ? 'area_total' : 'dimensoes'
+    } catch {
+      return 'dimensoes'
+    }
+  })
+
+  // Salva no sessionStorage quando o corretor altera o modo
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('simulador_modo_area', modoArea)
+    } catch {
+      // sessionStorage pode falhar em modo restrito
+    }
+  }, [modoArea])
+
   // Estados dos inputs do formulário
   const [quadra, setQuadra] = useState<QuadraValida>('S1')
   const [loteIdentificador, setLoteIdentificador] = useState('')
   const [largura, setLargura] = useState<number>(12)
   const [comprimento, setComprimento] = useState<number>(25)
+  const [areaTotalManual, setAreaTotalManual] = useState<number>(300)
   const [valorM2, setValorM2] = useState<number>(450)
   const [entrada, setEntrada] = useState<number>(20000)
   const [numParcelas, setNumParcelas] = useState<number>(48)
@@ -120,6 +140,7 @@ export default function Simulador() {
       setLoteIdentificador(lote.nome || '')
       setLargura(lote.largura)
       setComprimento(lote.comprimento)
+      setAreaTotalManual(Math.round(lote.largura * lote.comprimento * 100) / 100)
     }
   }
 
@@ -136,7 +157,8 @@ export default function Simulador() {
   const entradaMinima = config?.entrada_minima || 20000
   const isEntradaValida = entrada >= entradaMinima
   const isParcelasValida = numParcelas >= 1 && numParcelas <= maxParcelasPermitidas
-  const isDimensoesValidas = largura > 0 && comprimento > 0
+  const isAreaValida =
+    modoArea === 'area_total' ? areaTotalManual > 0 : largura > 0 && comprimento > 0
 
   // Cálculo da simulação
   const simulacao = useMemo(() => {
@@ -147,6 +169,17 @@ export default function Simulador() {
     }
     const ipca = config?.ipca_anual || 4.5
 
+    if (modoArea === 'area_total') {
+      return calcularFinanciamento({
+        areaM2: areaTotalManual || 0,
+        valorM2: valorM2 || 0,
+        entrada: entrada || 0,
+        numParcelas: Math.max(1, Math.min(numParcelas || 1, maxParcelasPermitidas)),
+        fatores,
+        ipcaAnual: ipca,
+      })
+    }
+
     return calcularFinanciamento({
       largura: largura || 0,
       comprimento: comprimento || 0,
@@ -156,7 +189,17 @@ export default function Simulador() {
       fatores,
       ipcaAnual: ipca,
     })
-  }, [largura, comprimento, valorM2, entrada, numParcelas, maxParcelasPermitidas, config])
+  }, [
+    modoArea,
+    areaTotalManual,
+    largura,
+    comprimento,
+    valorM2,
+    entrada,
+    numParcelas,
+    maxParcelasPermitidas,
+    config,
+  ])
 
   const handleChipClick = (parcelas: number) => {
     setNumParcelas(parcelas)
@@ -186,11 +229,14 @@ export default function Simulador() {
 
   // Abrir Modal de Salvar
   const handleOpenSalvar = () => {
-    if (!isEntradaValida || !isParcelasValida || !isDimensoesValidas) {
+    if (!isEntradaValida || !isParcelasValida || !isAreaValida) {
       toast({
         variant: 'destructive',
         title: 'Verifique os dados',
-        description: 'Preencha valores válidos de entrada, dimensões e parcelas antes de salvar.',
+        description:
+          modoArea === 'area_total'
+            ? 'Preencha valores válidos de entrada, área total e parcelas antes de salvar.'
+            : 'Preencha valores válidos de entrada, dimensões e parcelas antes de salvar.',
       })
       return
     }
@@ -314,12 +360,21 @@ export default function Simulador() {
                   {loteIdentificador || 'A definir'}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-neutral-600">Dimensões:</span>
-                <span className="font-semibold text-neutral-900">
-                  {formatarNumero(largura, 1)}m × {formatarNumero(comprimento, 1)}m
-                </span>
-              </div>
+              {modoArea === 'dimensoes' ? (
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">Dimensões:</span>
+                  <span className="font-semibold text-neutral-900">
+                    {formatarNumero(largura, 1)}m × {formatarNumero(comprimento, 1)}m
+                  </span>
+                </div>
+              ) : (
+                <div className="flex justify-between">
+                  <span className="text-neutral-600">Tipo do Lote:</span>
+                  <span className="font-semibold text-neutral-900">
+                    Irregular (Área Total Direta)
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-neutral-600">Área Total:</span>
                 <span className="font-bold text-neutral-900">
@@ -479,47 +534,137 @@ export default function Simulador() {
             </div>
           </div>
 
-          {/* Dimensões */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="largura" className="text-xs font-semibold text-[#6E675F]">
-                Largura (m)
+          {/* Seletor de Modo de Área: Frente x Lateral vs Área Total (Irregulares) */}
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-semibold text-[#6E675F]">
+                Forma de Cálculo da Área
               </Label>
-              <Input
-                id="largura"
-                type="number"
-                step="0.1"
-                min="0"
-                value={largura || ''}
-                onChange={(e) => setLargura(parseFloat(e.target.value) || 0)}
-                className="h-10 border-[#E6DFD6] tabular-nums"
-              />
+              <span className="text-[11px] text-[#C2501A] font-medium">
+                {modoArea === 'area_total' ? 'Lote Irregular' : 'Lote Regular'}
+              </span>
             </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="comprimento" className="text-xs font-semibold text-[#6E675F]">
-                Comprimento (m)
-              </Label>
-              <Input
-                id="comprimento"
-                type="number"
-                step="0.1"
-                min="0"
-                value={comprimento || ''}
-                onChange={(e) => setComprimento(parseFloat(e.target.value) || 0)}
-                className="h-10 border-[#E6DFD6] tabular-nums"
-              />
-            </div>
-
-            {/* Área Computada */}
-            <div className="col-span-2 sm:col-span-1 space-y-1.5">
-              <Label className="text-xs font-semibold text-[#6E675F]">Área (m²)</Label>
-              <div className="h-10 px-3 bg-[#FAF7F2] border border-[#E6DFD6] rounded-md flex items-center justify-between font-bold text-[#2E2A25] tabular-nums text-sm">
-                <span>{formatarNumero(simulacao.areaM2)}</span>
-                <span className="text-[11px] font-normal text-[#6E675F]">m²</span>
-              </div>
+            <div className="grid grid-cols-2 p-1 bg-[#FAF7F2] border border-[#E6DFD6] rounded-xl text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => {
+                  setModoArea('dimensoes')
+                  // Sincroniza se a área manual estava em uso
+                  if (largura > 0 && comprimento > 0) {
+                    setAreaTotalManual(Math.round(largura * comprimento * 100) / 100)
+                  }
+                }}
+                className={`py-2 px-3 rounded-lg transition-all text-center ${
+                  modoArea === 'dimensoes'
+                    ? 'bg-white text-[#C2501A] shadow-sm font-bold border border-[#E6DFD6]'
+                    : 'text-[#6E675F] hover:text-[#2E2A25]'
+                }`}
+              >
+                Frente × Lateral
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setModoArea('area_total')
+                  // Garante valor coerente para a área manual inicial
+                  if (simulacao.areaM2 > 0) {
+                    setAreaTotalManual(simulacao.areaM2)
+                  }
+                }}
+                className={`py-2 px-3 rounded-lg transition-all text-center ${
+                  modoArea === 'area_total'
+                    ? 'bg-white text-[#C2501A] shadow-sm font-bold border border-[#E6DFD6]'
+                    : 'text-[#6E675F] hover:text-[#2E2A25]'
+                }`}
+              >
+                Área Total (m²)
+              </button>
             </div>
           </div>
+
+          {/* Campos de Dimensões / Área dependendo do modo selecionado */}
+          {modoArea === 'dimensoes' ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="largura" className="text-xs font-semibold text-[#6E675F]">
+                  Largura / Frente (m)
+                </Label>
+                <Input
+                  id="largura"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={largura || ''}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0
+                    setLargura(val)
+                    setAreaTotalManual(Math.round(val * comprimento * 100) / 100)
+                  }}
+                  className="h-10 border-[#E6DFD6] tabular-nums"
+                  placeholder="Ex: 12"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="comprimento" className="text-xs font-semibold text-[#6E675F]">
+                  Comprimento (m)
+                </Label>
+                <Input
+                  id="comprimento"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={comprimento || ''}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0
+                    setComprimento(val)
+                    setAreaTotalManual(Math.round(largura * val * 100) / 100)
+                  }}
+                  className="h-10 border-[#E6DFD6] tabular-nums"
+                  placeholder="Ex: 25"
+                />
+              </div>
+
+              {/* Área Computada */}
+              <div className="col-span-2 sm:col-span-1 space-y-1.5">
+                <Label className="text-xs font-semibold text-[#6E675F]">Área Calculada</Label>
+                <div className="h-10 px-3 bg-[#FAF7F2] border border-[#E6DFD6] rounded-md flex items-center justify-between font-bold text-[#2E2A25] tabular-nums text-sm">
+                  <span>{formatarNumero(simulacao.areaM2)}</span>
+                  <span className="text-[11px] font-normal text-[#6E675F]">m²</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="areaTotalManual" className="text-xs font-semibold text-[#6E675F]">
+                  Área Total do Lote (m²) <span className="text-[#C2501A]">*</span>
+                </Label>
+                <span className="text-[11px] text-[#6E675F]">Para lotes irregulares</span>
+              </div>
+              <div className="relative">
+                <Input
+                  id="areaTotalManual"
+                  type="number"
+                  step="0.01"
+                  min="1"
+                  value={areaTotalManual || ''}
+                  onChange={(e) => setAreaTotalManual(parseFloat(e.target.value) || 0)}
+                  placeholder="Ex: 342.50"
+                  className={`h-10 border-[#E6DFD6] font-bold tabular-nums pr-12 ${
+                    areaTotalManual <= 0 ? 'border-red-500' : ''
+                  }`}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#6E675F] pointer-events-none">
+                  m²
+                </span>
+              </div>
+              <p className="text-[11px] text-[#6E675F]">
+                Informe a metragem total diretamente conforme a matrícula / planta do lote
+                irregular.
+              </p>
+            </div>
+          )}
 
           {/* Valores Financeiros: Valor do m² e Valor Total Computado */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-[#E6DFD6]">
@@ -644,7 +789,7 @@ export default function Simulador() {
           <Button
             type="button"
             onClick={handleCalcular}
-            disabled={!isEntradaValida || !isParcelasValida || !isDimensoesValidas}
+            disabled={!isEntradaValida || !isParcelasValida || !isAreaValida}
             className="w-full h-11 bg-[#C2501A] hover:bg-[#A84415] text-white font-semibold text-sm rounded-xl shadow-sm hover-lift flex items-center justify-center gap-2"
           >
             <Calculator className="w-4 h-4" />

@@ -65,4 +65,23 @@ describe('Cálculos de Financiamento Jd Europa', () => {
     expect(res.valorFinanciado).toBe(92500)
     expect(res.parcelaMensal).toBeCloseTo(3072.32, 2)
   })
+
+  it('deve permitir calcular diretamente pela área total (lotes irregulares)', () => {
+    // Exemplo de lote irregular: 342.75 m² a R$ 450 = R$ 154.237,50
+    // Entrada R$ 30.000 -> Financiado R$ 124.237,50
+    // 48 meses com fator 0.0263338 -> 124.237,50 * 0.0263338 = 3271.65
+    const res = calcularFinanciamento({
+      areaM2: 342.75,
+      valorM2: 450,
+      entrada: 30000,
+      numParcelas: 48,
+      fatores: fatoresPadrao,
+      ipcaAnual: 4.5,
+    })
+
+    expect(res.areaM2).toBe(342.75)
+    expect(res.valorTotalLote).toBe(154237.5)
+    expect(res.valorFinanciado).toBe(124237.5)
+    expect(res.parcelaMensal).toBeCloseTo(3271.65, 2)
+  })
 })
