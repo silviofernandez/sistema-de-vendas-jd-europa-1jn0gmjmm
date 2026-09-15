@@ -413,7 +413,9 @@ export default function Simulador() {
             <p className="text-sm font-semibold text-neutral-800">
               Data: {new Date().toLocaleDateString('pt-BR')}
             </p>
-            <p className="text-xs text-neutral-500">Corretor: gabsilvio@gmail.com</p>
+            <p className="text-xs text-neutral-500">
+              Corretor: {user?.name || user?.email || 'gabsilvio@gmail.com'}
+            </p>
           </div>
         </div>
 

@@ -114,11 +114,11 @@ export function gerarMensagemPropostaWhatsApp(params: PropostaWhatsAppParams): s
     `• *Total financiado:* ${formatarMoeda(totalFinanciado)}`,
     ``,
     `ℹ️ *Condições & Correção:*`,
-    `• Correção anual pelo índice IPCA (${formatarNumero(ipcaAnual, 2)}% a.a.).`,
+    `• Correção anual pelo índice IPCA.`,
     `• Financiamento direto, sem burocracia bancária.`,
     `• Entrada facilitada e aprovação rápida.`,
     ``,
-    corretorNome ? `👤 *Corretor Responsável:* ${corretorNome}` : `👤 *Atendimento Jardim Europa*`,
+    corretorNome ? `👤 *Atendimento:* ${corretorNome}` : `👤 *Atendimento Jardim Europa*`,
     `Fico à sua disposição para agendarmos uma visita ao local ou darmos andamento na reserva do lote!`,
   ]
 

@@ -50,8 +50,10 @@ describe('Utilitários de WhatsApp e Mensagens Profissionais', () => {
     expect(msg).toContain('48 meses') // Parcelas
     expect(msg).toContain('VALOR DE CADA PARCELA')
     expect(msg).toContain('R$ 2.896,72')
-    expect(msg).toContain('IPCA')
-    expect(msg).toContain('Silvio (Master)')
+    expect(msg).toContain('• Correção anual pelo índice IPCA.')
+    expect(msg).not.toContain('4,5% a.a.')
+    expect(msg).not.toContain('4.5% a.a.')
+    expect(msg).toContain('👤 *Atendimento:* Silvio (Master)')
   })
 
   it('deve formatar proposta para lote irregular por área total', () => {
