@@ -32,6 +32,10 @@ export const corretoresService = {
     })
   },
 
+  async requestPasswordReset(email: string): Promise<boolean> {
+    return await pb.collection('users').requestPasswordReset(email)
+  },
+
   async update(id: string, data: UpdateCorretorData): Promise<UserRecord> {
     return await pb.collection('users').update<UserRecord>(id, data)
   },

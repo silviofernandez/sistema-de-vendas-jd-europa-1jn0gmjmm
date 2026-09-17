@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-15T19:44:31.086Z",
+  "generatedAt": "2026-09-17T01:43:46.141Z",
   "collections": [
     {
       "name": "users",
@@ -7,7 +7,7 @@
       "apiRules": {
         "list": "@request.auth.id != ''",
         "view": "@request.auth.id != ''",
-        "create": "@request.auth.id != '' && @request.auth.role = 'master'",
+        "create": "@request.auth.id = '' || @request.auth.role = 'master'",
         "update": "@request.auth.id != '' && (@request.auth.role = 'master' || id = @request.auth.id)",
         "delete": "@request.auth.id != '' && @request.auth.role = 'master' && id != @request.auth.id"
       },

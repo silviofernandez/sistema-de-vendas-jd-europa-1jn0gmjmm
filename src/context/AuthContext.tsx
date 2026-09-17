@@ -11,6 +11,14 @@ interface AuthContextType {
   isMaster: boolean
   isLoading: boolean
   login: (email: string, pass: string) => Promise<void>
+  register: (data: {
+    name: string
+    email: string
+    password: string
+    passwordConfirm: string
+    telefone?: string
+  }) => Promise<void>
+  requestPasswordReset: (email: string) => Promise<void>
   logout: () => void
   refreshUser: () => Promise<void>
 }
@@ -63,6 +71,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(authData.token)
   }
 
+  const register = async (data: {
+    name: string
+    email: string
+    password: string
+    passwordConfirm: string
+    telefone?: string
+  }) => {
+    await pb.collection('users').create({
+      ...data,
+      role: 'corretor',
+      emailVisibility: true,
+    })
+    // Efetua login automaticamente após o registro bem-sucedido
+    await login(data.email, data.password)
+  }
+
+  const requestPasswordReset = async (email: string) => {
+    await pb.collection('users').requestPasswordReset(email)
+  }
+
   const logout = () => {
     pb.authStore.clear()
     setUser(null)
@@ -80,6 +108,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isMaster,
         isLoading,
         login,
+        register,
+        requestPasswordReset,
         logout,
         refreshUser,
       }}
