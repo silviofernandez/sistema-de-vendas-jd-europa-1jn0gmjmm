@@ -11,6 +11,7 @@ import Layout from '@/components/Layout'
 
 import Index from '@/pages/Index'
 import Login from '@/pages/Login'
+import Autorizar from '@/pages/Autorizar'
 import Simulador from '@/pages/Simulador'
 import Lotes from '@/pages/Lotes'
 import Clientes from '@/pages/Clientes'
@@ -26,8 +27,9 @@ const App = () => (
           <Toaster />
           <Sonner />
           <Routes>
-            {/* Rota pública de login */}
+            {/* Rota pública de login e autorização de pedidos */}
             <Route path="/login" element={<Login />} />
+            <Route path="/autorizar" element={<Autorizar />} />
 
             {/* Rotas protegidas dentro do Layout padrão */}
             <Route element={<Layout />}>

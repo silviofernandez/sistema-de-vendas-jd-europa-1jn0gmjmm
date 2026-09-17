@@ -4,6 +4,7 @@ import {
   aplicarMascaraTelefone,
   gerarMensagemPropostaWhatsApp,
   gerarMensagemAcessoCorretor,
+  gerarMensagemConviteCorretor,
 } from './whatsapp'
 
 describe('Utilitários de WhatsApp e Mensagens Profissionais', () => {
@@ -86,5 +87,14 @@ describe('Utilitários de WhatsApp e Mensagens Profissionais', () => {
     expect(msg).toContain('carlos@vendas.com')
     expect(msg).toContain('SenhaForte123!')
     expect(msg).toContain('https://jd-europa.app/login')
+  })
+
+  it('deve gerar mensagem de convite para corretor se cadastrar', () => {
+    const msg = gerarMensagemConviteCorretor({
+      appUrl: 'https://jd-europa.app',
+    })
+    expect(msg).toContain('CONVITE - SISTEMA DE VENDAS JD EUROPA')
+    expect(msg).toContain('https://jd-europa.app/login')
+    expect(msg).toContain('Criar Conta')
   })
 })

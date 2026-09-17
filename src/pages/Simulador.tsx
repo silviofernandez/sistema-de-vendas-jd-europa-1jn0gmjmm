@@ -16,6 +16,7 @@ import {
   Share2,
   Phone,
 } from 'lucide-react'
+import { PwaInstallBanner } from '@/components/PwaInstallBanner'
 import { useConfig } from '@/context/ConfigContext'
 import { useAuth } from '@/context/AuthContext'
 import {
@@ -402,6 +403,9 @@ export default function Simulador() {
 
   return (
     <div className="space-y-6">
+      {/* Banner de Instalação do App (PWA) no topo do Simulador */}
+      <PwaInstallBanner />
+
       {/* Visualização de Impressão (aparece apenas ao imprimir) */}
       <div className="hidden print:block proposal-print-card bg-white p-8 rounded-none border border-neutral-300">
         <div className="border-b border-neutral-300 pb-4 mb-6 flex justify-between items-center">

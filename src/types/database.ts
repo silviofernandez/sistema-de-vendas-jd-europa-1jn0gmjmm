@@ -22,13 +22,25 @@ export interface LoteRecord extends RecordModel {
 }
 
 export type UserRole = 'master' | 'corretor'
+export type UserStatus = 'aprovado' | 'pendente' | 'rejeitado'
 
 export interface UserRecord extends RecordModel {
   name: string
   email: string
   role?: UserRole
+  status?: UserStatus
   telefone?: string
   avatar?: string
+}
+
+export interface PedidoCadastroRecord extends RecordModel {
+  nome: string
+  email: string
+  telefone?: string
+  status: UserStatus
+  token: string
+  user_id?: string
+  observacao?: string
 }
 
 export interface ClienteRecord extends RecordModel {

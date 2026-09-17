@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { useLocation, Link, useNavigate, Outlet } from 'react-router-dom'
 import {
   Calculator,
@@ -9,14 +10,41 @@ import {
   Trees,
   UserCheck,
   Shield,
+  Bell,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { useRealtime } from '@/hooks/use-realtime'
+import { pedidosService } from '@/services/pedidos'
+import type { PedidoCadastroRecord } from '@/types/database'
 import { Button } from '@/components/ui/button'
 
 export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, logout, isAuthenticated, isMaster } = useAuth()
+  const [pedidosPendentesCount, setPedidosPendentesCount] = useState<number>(0)
+
+  useEffect(() => {
+    if (isMaster) {
+      pedidosService
+        .listarPedidos()
+        .then((list) => {
+          setPedidosPendentesCount(list.filter((p) => p.status === 'pendente').length)
+        })
+        .catch(() => {})
+    }
+  }, [isMaster, location.pathname])
+
+  useRealtime<PedidoCadastroRecord>('pedidos_cadastro', () => {
+    if (isMaster) {
+      pedidosService
+        .listarPedidos()
+        .then((list) => {
+          setPedidosPendentesCount(list.filter((p) => p.status === 'pendente').length)
+        })
+        .catch(() => {})
+    }
+  })
 
   const navItems = [
     { path: '/simulador', label: 'Simulador', icon: Calculator, masterOnly: false },
@@ -30,8 +58,8 @@ export default function Layout() {
       : []),
   ]
 
-  // Se for a rota de login, não mostra sidebar nem header
-  if (location.pathname === '/login' || !isAuthenticated) {
+  // Se for rota pública (login ou autorizar) ou usuário não autenticado, não mostra sidebar nem header
+  if (location.pathname === '/login' || location.pathname === '/autorizar' || !isAuthenticated) {
     return <Outlet />
   }
 
@@ -79,21 +107,30 @@ export default function Layout() {
           {navItems.map((item) => {
             const Icon = item.icon
             const isActive = location.pathname === item.path
+            const showBadge = item.path === '/corretores' && pedidosPendentesCount > 0
+
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   isActive
                     ? 'bg-[#C2501A] text-white shadow-sm'
                     : 'text-[#6E675F] hover:bg-[#FAF7F2] hover:text-[#2E2A25]'
-                } justify-center lg:justify-start`}
+                }`}
                 title={item.label}
               >
-                <Icon
-                  className={`w-5 h-5 shrink-0 ${isActive ? 'text-white' : 'text-[#6E675F]'}`}
-                />
-                <span className="hidden lg:inline">{item.label}</span>
+                <div className="flex items-center gap-3">
+                  <Icon
+                    className={`w-5 h-5 shrink-0 ${isActive ? 'text-white' : 'text-[#6E675F]'}`}
+                  />
+                  <span className="hidden lg:inline">{item.label}</span>
+                </div>
+                {showBadge && (
+                  <span className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full hidden lg:inline">
+                    {pedidosPendentesCount}
+                  </span>
+                )}
               </Link>
             )
           })}
@@ -154,6 +191,19 @@ export default function Layout() {
           </div>
 
           <div className="flex items-center gap-3">
+            {isMaster && pedidosPendentesCount > 0 && (
+              <Link
+                to="/corretores"
+                className="flex items-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-colors animate-pulse"
+                title={`${pedidosPendentesCount} pedidos de cadastro aguardando autorização`}
+              >
+                <Bell className="w-4 h-4 text-amber-600" />
+                <span className="hidden sm:inline">
+                  {pedidosPendentesCount} pendente{pedidosPendentesCount > 1 ? 's' : ''}
+                </span>
+              </Link>
+            )}
+
             <div className="hidden sm:flex items-center gap-2 text-right">
               <span className="text-xs font-medium text-[#2E2A25]">
                 {user?.name || (isMaster ? 'Silvio (Master)' : 'Corretor')}
@@ -191,6 +241,8 @@ export default function Layout() {
         {navItems.map((item) => {
           const Icon = item.icon
           const isActive = location.pathname === item.path
+          const showBadge = item.path === '/corretores' && pedidosPendentesCount > 0
+
           return (
             <Link
               key={item.path}
@@ -202,7 +254,14 @@ export default function Layout() {
               {isActive && (
                 <span className="absolute top-0 w-8 h-1 bg-[#C2501A] rounded-b-full transition-all" />
               )}
-              <Icon className="w-5 h-5 mb-0.5" />
+              <div className="relative">
+                <Icon className="w-5 h-5 mb-0.5" />
+                {showBadge && (
+                  <span className="absolute -top-1 -right-2 w-3.5 h-3.5 bg-amber-500 text-white rounded-full text-[8px] flex items-center justify-center font-bold">
+                    {pedidosPendentesCount}
+                  </span>
+                )}
+              </div>
               <span
                 className={`text-[9px] font-medium leading-tight ${isActive ? 'font-bold' : ''}`}
               >
@@ -210,7 +269,7 @@ export default function Layout() {
               </span>
             </Link>
           )
-        })}
+        })}{' '}
       </nav>
     </div>
   )

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-17T01:43:46.141Z",
+  "generatedAt": "2026-09-17T15:02:47.347Z",
   "collections": [
     {
       "name": "users",
@@ -50,6 +50,13 @@
           "type": "text",
           "required": false,
           "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["aprovado", "pendente", "rejeitado"]
         }
       ],
       "indexes": [
@@ -323,6 +330,82 @@
       "indexes": [
         "CREATE INDEX idx_propostas_cliente ON propostas (cliente)",
         "CREATE INDEX idx_propostas_created ON propostas (created DESC)"
+      ]
+    },
+    {
+      "name": "pedidos_cadastro",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && @request.auth.role = 'master'",
+        "view": "(@request.auth.id != '' && @request.auth.role = 'master') || token != ''",
+        "create": "",
+        "update": "@request.auth.id != '' && @request.auth.role = 'master'",
+        "delete": "@request.auth.id != '' && @request.auth.role = 'master'"
+      },
+      "fields": [
+        {
+          "name": "nome",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "email",
+          "type": "email",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "telefone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["pendente", "aprovado", "rejeitado"]
+        },
+        {
+          "name": "token",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "user_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "observacao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_pedidos_token ON pedidos_cadastro (token)",
+        "CREATE INDEX idx_pedidos_status ON pedidos_cadastro (status)",
+        "CREATE INDEX idx_pedidos_email ON pedidos_cadastro (email)"
       ]
     }
   ]

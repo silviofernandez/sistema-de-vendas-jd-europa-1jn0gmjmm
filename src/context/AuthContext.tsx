@@ -67,7 +67,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, pass: string) => {
     const authData = await pb.collection('users').authWithPassword(email, pass)
-    setUser(authData.record as unknown as UserRecord)
+    const loggedUser = authData.record as unknown as UserRecord
+
+    // Valida se o usuário está pendente de aprovação ou rejeitado (exceto se for master)
+    const isMasterUser = loggedUser.role === 'master' || loggedUser.email === 'gabsilvio@gmail.com'
+    if (!isMasterUser) {
+      if (loggedUser.status === 'pendente') {
+        pb.authStore.clear()
+        setUser(null)
+        setToken('')
+        const err = new Error('Seu cadastro está aguardando autorização do administrador.')
+        ;(err as unknown as { code: string }).code = 'PENDING_APPROVAL'
+        throw err
+      }
+      if (loggedUser.status === 'rejeitado') {
+        pb.authStore.clear()
+        setUser(null)
+        setToken('')
+        const err = new Error('Seu acesso não foi autorizado pelo administrador.')
+        ;(err as unknown as { code: string }).code = 'REJECTED'
+        throw err
+      }
+    }
+
+    setUser(loggedUser)
     setToken(authData.token)
   }
 
@@ -78,13 +101,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     passwordConfirm: string
     telefone?: string
   }) => {
-    await pb.collection('users').create({
-      ...data,
-      role: 'corretor',
-      emailVisibility: true,
+    // Importante: no novo fluxo, auto-cadastro cria pedido e usuário pendente
+    // Delegado ao pedidosService para criar token, avisar master por e-mail e registrar pendência
+    const { pedidosService } = await import('@/services/pedidos')
+    await pedidosService.solicitarCadastro({
+      nome: data.name,
+      email: data.email,
+      telefone: data.telefone,
+      password: data.password,
     })
-    // Efetua login automaticamente após o registro bem-sucedido
-    await login(data.email, data.password)
   }
 
   const requestPasswordReset = async (email: string) => {

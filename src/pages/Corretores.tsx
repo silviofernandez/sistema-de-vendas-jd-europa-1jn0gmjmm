@@ -14,13 +14,21 @@ import {
   Lock,
   User,
   ExternalLink,
+  UserPlus,
+  Clock,
+  Check,
+  X,
+  Copy,
+  Send,
 } from 'lucide-react'
 import { corretoresService } from '@/services/corretores'
+import { pedidosService } from '@/services/pedidos'
 import { useAuth } from '@/context/AuthContext'
 import { useRealtime } from '@/hooks/use-realtime'
-import type { UserRecord } from '@/types/database'
+import type { UserRecord, PedidoCadastroRecord } from '@/types/database'
 import {
   gerarMensagemAcessoCorretor,
+  gerarMensagemConviteCorretor,
   abrirWhatsApp,
   aplicarMascaraTelefone,
   formatarNumeroWhatsapp,
@@ -43,8 +51,17 @@ export default function Corretores() {
   const { toast } = useToast()
 
   const [corretores, setCorretores] = useState<UserRecord[]>([])
+  const [pedidos, setPedidos] = useState<PedidoCadastroRecord[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [isLoading, setIsLoading] = useState(true)
+
+  // Estado Modal Convidar Corretor
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
+  const [invitePhone, setInvitePhone] = useState('')
+  const [copiedInvite, setCopiedInvite] = useState(false)
+
+  // Estado Ações de Pedidos (Autorizar / Rejeitar com 1 clique)
+  const [processingPedidoId, setProcessingPedidoId] = useState<string | null>(null)
 
   // Modal Novo Corretor
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -79,26 +96,49 @@ export default function Corretores() {
   const fetchCorretores = async () => {
     try {
       const list = await corretoresService.getAll()
-      setCorretores(list)
+      // Filtra para exibir usuários que não foram rejeitados
+      setCorretores(list.filter((c) => c.status !== 'rejeitado'))
     } catch {
       toast({
         variant: 'destructive',
         title: 'Erro ao listar corretores',
         description: 'Verifique suas credenciais de administrador.',
       })
-    } finally {
-      setIsLoading(false)
     }
   }
 
+  const fetchPedidos = async () => {
+    try {
+      const list = await pedidosService.listarPedidos()
+      setPedidos(list)
+    } catch {
+      // Ignora se não houver pedidos ou erro
+    }
+  }
+
+  const loadAll = async () => {
+    setIsLoading(true)
+    await Promise.all([fetchCorretores(), fetchPedidos()])
+    setIsLoading(false)
+  }
+
   useEffect(() => {
-    fetchCorretores()
+    loadAll()
   }, [])
 
-  // Atualização em tempo real na collection users
+  // Atualização em tempo real na collection users e pedidos_cadastro
   useRealtime<UserRecord>('users', () => {
     fetchCorretores()
   })
+
+  useRealtime<PedidoCadastroRecord>('pedidos_cadastro', () => {
+    fetchPedidos()
+  })
+
+  // Pedidos Pendentes
+  const pedidosPendentes = useMemo(() => {
+    return pedidos.filter((p) => p.status === 'pendente')
+  }, [pedidos])
 
   // Filtro
   const corretoresFiltrados = useMemo(() => {
@@ -120,6 +160,72 @@ export default function Corretores() {
     setFormPassword('')
     setFormTelefone('')
     setIsCreateModalOpen(true)
+  }
+
+  // Ação de Autorizar Pedido em 1 clique
+  const handleAutorizarPedido = async (pedido: PedidoCadastroRecord) => {
+    setProcessingPedidoId(pedido.id)
+    try {
+      await pedidosService.autorizarPedido(pedido)
+      toast({
+        title: 'Acesso Autorizado!',
+        description: `${pedido.nome} foi liberado para acessar o sistema com a senha que cadastrou.`,
+      })
+      await Promise.all([fetchPedidos(), fetchCorretores()])
+    } catch (err: unknown) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao autorizar pedido',
+        description: 'Tente novamente.',
+      })
+    } finally {
+      setProcessingPedidoId(null)
+    }
+  }
+
+  // Ação de Rejeitar Pedido
+  const handleRejeitarPedido = async (pedido: PedidoCadastroRecord) => {
+    setProcessingPedidoId(pedido.id)
+    try {
+      await pedidosService.rejeitarPedido(pedido)
+      toast({
+        title: 'Pedido Rejeitado',
+        description: `O acesso para ${pedido.nome} foi recusado.`,
+      })
+      await Promise.all([fetchPedidos(), fetchCorretores()])
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao rejeitar',
+        description: 'Tente novamente.',
+      })
+    } finally {
+      setProcessingPedidoId(null)
+    }
+  }
+
+  // Copiar link/mensagem de convite
+  const handleCopyInvite = () => {
+    const msg = gerarMensagemConviteCorretor({ appUrl: window.location.origin })
+    navigator.clipboard.writeText(msg)
+    setCopiedInvite(true)
+    setTimeout(() => setCopiedInvite(false), 2500)
+    toast({
+      title: 'Mensagem de convite copiada!',
+      description: 'Envie para o convidado colar e se cadastrar.',
+    })
+  }
+
+  // Enviar convite via WhatsApp direto
+  const handleSendInviteWhatsApp = () => {
+    const msg = gerarMensagemConviteCorretor({ appUrl: window.location.origin })
+    abrirWhatsApp(invitePhone, msg)
+    setIsInviteModalOpen(false)
+    setInvitePhone('')
+    toast({
+      title: 'WhatsApp Aberto!',
+      description: 'Mensagem de convite pronta para envio.',
+    })
   }
 
   // Gerar senha sugerida rápida (ex: Jd2026! ou Europa@123)
@@ -335,14 +441,113 @@ export default function Corretores() {
           </div>
         </div>
 
-        <Button
-          onClick={handleOpenCreate}
-          className="h-11 bg-[#C2501A] hover:bg-[#A84415] text-white font-semibold rounded-xl shadow-sm hover-lift flex items-center gap-2 shrink-0 w-full sm:w-auto justify-center"
-        >
-          <Plus className="w-4 h-4" />
-          Cadastrar Corretor
-        </Button>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto shrink-0">
+          <Button
+            onClick={() => setIsInviteModalOpen(true)}
+            variant="outline"
+            className="h-11 border-[#C2501A] text-[#C2501A] hover:bg-[#FAF7F2] font-semibold rounded-xl flex items-center gap-2 justify-center"
+          >
+            <UserPlus className="w-4 h-4" />
+            Convidar Corretor
+          </Button>
+
+          <Button
+            onClick={handleOpenCreate}
+            className="h-11 bg-[#C2501A] hover:bg-[#A84415] text-white font-semibold rounded-xl shadow-sm hover-lift flex items-center gap-2 justify-center"
+          >
+            <Plus className="w-4 h-4" />
+            Cadastrar Corretor
+          </Button>
+        </div>
       </div>
+
+      {/* SEÇÃO: Pedidos de Acesso Pendentes (Notificação no Sistema com Autorização em 1 clique) */}
+      {pedidosPendentes.length > 0 && (
+        <div className="bg-amber-50/70 border-2 border-amber-300 rounded-2xl p-5 shadow-sm space-y-3.5 animate-fade-in">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="font-bold text-sm sm:text-base text-[#2E2A25] flex items-center gap-2">
+                  Pedidos de Acesso Pendentes
+                  <span className="bg-amber-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full">
+                    {pedidosPendentes.length} {pedidosPendentes.length === 1 ? 'novo' : 'novos'}
+                  </span>
+                </h4>
+                <p className="text-xs text-[#6E675F]">
+                  Convidados que criaram conta e aguardam sua autorização para acessar o sistema.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+            {pedidosPendentes.map((ped) => {
+              const isProcessing = processingPedidoId === ped.id
+
+              return (
+                <div
+                  key={ped.id}
+                  className="bg-white rounded-xl p-4 border border-amber-200 shadow-xs flex flex-col justify-between gap-3"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <h5 className="font-bold text-sm text-[#2E2A25]">{ped.nome}</h5>
+                      <span className="text-[10px] text-amber-700 bg-amber-100 font-semibold px-2 py-0.5 rounded-full">
+                        Pendente
+                      </span>
+                    </div>
+
+                    <div className="text-xs text-[#6E675F] space-y-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <Mail className="w-3.5 h-3.5 text-[#C2501A]" />
+                        <span className="truncate">{ped.email}</span>
+                      </div>
+                      {ped.telefone && (
+                        <div className="flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5 text-[#4A7C59]" />
+                          <span>{ped.telefone}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-2 border-t border-[#E6DFD6]">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => handleAutorizarPedido(ped)}
+                      disabled={isProcessing}
+                      className="flex-1 h-9 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs rounded-lg flex items-center justify-center gap-1.5 shadow-xs"
+                    >
+                      {isProcessing ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Check className="w-3.5 h-3.5" />
+                      )}
+                      Autorizar Acesso
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRejeitarPedido(ped)}
+                      disabled={isProcessing}
+                      className="h-9 px-3 text-xs border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 rounded-lg"
+                    >
+                      <X className="w-3.5 h-3.5 mr-1" />
+                      Recusar
+                    </Button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Barra de Filtro e Totalizadores */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-[#E6DFD6] shadow-sm">
@@ -495,6 +700,88 @@ export default function Corretores() {
           })}
         </div>
       )}
+
+      {/* Modal 0: Convidar Corretor (Gerar Link e Enviar WhatsApp) */}
+      <Dialog open={isInviteModalOpen} onOpenChange={setIsInviteModalOpen}>
+        <DialogContent className="max-w-md bg-white border-[#E6DFD6]">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-[#2E2A25] flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-[#C2501A]" />
+              Convidar Novo Corretor
+            </DialogTitle>
+            <DialogDescription className="text-xs text-[#6E675F]">
+              Envie o link do sistema para um novo parceiro. Ele se cadastra, define sua própria
+              senha e você autoriza o acesso com 1 clique.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="p-3.5 bg-[#FAF7F2] rounded-xl border border-[#E6DFD6] space-y-2 text-xs">
+              <p className="font-semibold text-[#2E2A25]">Como funciona o fluxo:</p>
+              <ol className="list-decimal pl-4 space-y-1 text-[#6E675F]">
+                <li>Você envia o convite com o link do sistema;</li>
+                <li>
+                  O convidado clica em <b>Criar Conta</b> e digita nome, e-mail, WhatsApp e senha;
+                </li>
+                <li>
+                  Você recebe a notificação no seu e-mail e no sistema com <b>botão de autorizar</b>
+                  ;
+                </li>
+                <li>
+                  Ao autorizar, ele já pode entrar com a senha que escolheu e instalar o aplicativo!
+                </li>
+              </ol>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="inviteTel" className="text-xs font-semibold text-[#6E675F]">
+                Enviar direto para o WhatsApp do Convidado:
+              </Label>
+              <div className="relative">
+                <Phone className="w-4 h-4 text-[#6E675F] absolute left-3 top-1/2 -translate-y-1/2" />
+                <Input
+                  id="inviteTel"
+                  type="tel"
+                  placeholder="(11) 98765-4321"
+                  value={invitePhone}
+                  onChange={(e) => setInvitePhone(aplicarMascaraTelefone(e.target.value))}
+                  className="pl-9 border-[#E6DFD6]"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <Button
+                type="button"
+                onClick={handleSendInviteWhatsApp}
+                className="w-full h-11 bg-[#25D366] hover:bg-[#20ba59] text-white font-semibold text-xs rounded-xl flex items-center justify-center gap-2 shadow-xs"
+              >
+                <Share2 className="w-4 h-4" />
+                Enviar Convite pelo WhatsApp
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCopyInvite}
+                className="w-full h-11 border-[#E6DFD6] text-[#2E2A25] font-semibold text-xs rounded-xl flex items-center justify-center gap-2"
+              >
+                {copiedInvite ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 text-[#4A7C59]" />
+                    Mensagem Copiada!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4 text-[#6E675F]" />
+                    Copiar Mensagem do Convite
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal 1: Cadastrar Corretor */}
       <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>

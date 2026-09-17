@@ -125,6 +125,31 @@ export function gerarMensagemPropostaWhatsApp(params: PropostaWhatsAppParams): s
   return linhas.join('\n')
 }
 
+export interface ConviteCorretorParams {
+  appUrl?: string
+}
+
+/**
+ * Gera mensagem de convite para envio ao convidado/corretor se cadastrar
+ */
+export function gerarMensagemConviteCorretor(params: ConviteCorretorParams = {}): string {
+  const url = params.appUrl || window.location.origin
+  const linhas = [
+    `👋 *CONVITE - SISTEMA DE VENDAS JD EUROPA*`,
+    ``,
+    `Olá! Você foi convidado para acessar a ferramenta oficial de vendas e simulação de financiamento do *Loteamento Jardim Europa*.`,
+    ``,
+    `📲 *COMO ACESSAR:*`,
+    `1. Acesse o link: ${url}/login`,
+    `2. Clique na aba *Criar Conta*`,
+    `3. Preencha seu nome, e-mail, telefone (WhatsApp) e defina sua senha`,
+    `4. Ao concluir, seu pedido será enviado para autorização imediata`,
+    ``,
+    `Assim que autorizado, você poderá entrar com a senha que definiu e também instalar o app no seu celular, iPad ou computador.`,
+  ]
+  return linhas.join('\n')
+}
+
 export interface AcessoCorretorParams {
   nome: string
   email: string

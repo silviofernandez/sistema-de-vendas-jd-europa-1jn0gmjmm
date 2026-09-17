@@ -42,6 +42,13 @@ export default function Login() {
   const [forgotSuccess, setForgotSuccess] = useState(false)
   const [forgotNotice, setForgotNotice] = useState<string | null>(null)
 
+  // Estado Pedido de Cadastro Realizado (Aguardando Aprovação)
+  const [pedidoSuccess, setPedidoSuccess] = useState<{
+    nome: string
+    email: string
+    telefone: string
+  } | null>(null)
+
   // Feedback geral
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -65,14 +72,25 @@ export default function Login() {
     try {
       await login(loginEmail.trim(), loginPassword)
       navigate('/simulador')
-    } catch {
-      setError('E-mail ou senha incorretos. Verifique suas credenciais.')
+    } catch (err: unknown) {
+      const e = err as { code?: string; message?: string }
+      if (e?.code === 'PENDING_APPROVAL' || e?.message?.includes('aguardando autorização')) {
+        setError(
+          'Aguarde autorização do administrador. Seu pedido de acesso foi enviado e o administrador foi notificado.',
+        )
+      } else if (e?.code === 'REJECTED' || e?.message?.includes('não foi autorizado')) {
+        setError(
+          'Seu acesso não foi autorizado pelo administrador. Entre em contato com a gerência.',
+        )
+      } else {
+        setError('E-mail ou senha incorretos. Verifique suas credenciais.')
+      }
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  // Submissão do Registro (Criar Conta de Corretor)
+  // Submissão do Registro (Criar Conta de Corretor -> Fluxo de Pedido de Aprovação)
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -107,15 +125,23 @@ export default function Login() {
         password: regPassword,
         passwordConfirm: regPasswordConfirm,
       })
-      navigate('/simulador')
+      setPedidoSuccess({
+        nome: regNome.trim(),
+        email: regEmail.trim().toLowerCase(),
+        telefone: regTelefone.trim(),
+      })
     } catch (err: unknown) {
       const fieldErrors = extractFieldErrors(err)
       if (fieldErrors.email) {
-        setError('Este e-mail já está cadastrado ou é inválido.')
+        setError(
+          'Este e-mail já está cadastrado. Se esqueceu sua senha, utilize a recuperação de senha.',
+        )
       } else if (fieldErrors.password || fieldErrors.passwordConfirm) {
         setError('A senha deve ter no mínimo 8 caracteres e coincidir.')
       } else {
-        setError('Não foi possível concluir o cadastro. Verifique os dados e tente novamente.')
+        setError(
+          'Não foi possível enviar sua solicitação de cadastro. Verifique os dados ou contate o administrador.',
+        )
       }
     } finally {
       setIsSubmitting(false)
@@ -298,7 +324,58 @@ export default function Login() {
         )}
 
         {/* FORMULÁRIO 2: REGISTRAR (CRIAR CONTA DE CORRETOR) */}
-        {mode === 'register' && (
+        {mode === 'register' && pedidoSuccess && (
+          <div className="space-y-4 text-center animate-fade-in py-2">
+            <div className="w-14 h-14 rounded-full bg-orange-100 text-[#C2501A] flex items-center justify-center mx-auto shadow-sm">
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-[#2E2A25]">Pedido de Acesso Enviado!</h3>
+              <p className="text-xs text-[#6E675F] mt-1">
+                Olá, <strong className="text-[#2E2A25]">{pedidoSuccess.nome}</strong>! Sua
+                solicitação foi registrada com sucesso.
+              </p>
+            </div>
+
+            <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E6DFD6] text-left text-xs space-y-2 leading-relaxed">
+              <div className="flex items-start gap-2 text-[#4A7C59] font-medium">
+                <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  O administrador (Silvio) foi notificado no sistema e por e-mail com 1 clique de
+                  autorização.
+                </span>
+              </div>
+              <div className="flex items-start gap-2 text-[#6E675F]">
+                <Lock className="w-4 h-4 shrink-0 mt-0.5 text-[#C2501A]" />
+                <span>
+                  Assim que ele autorizar, você poderá entrar com a <strong>mesma senha</strong> que
+                  você acabou de definir.
+                </span>
+              </div>
+              <div className="flex items-start gap-2 text-[#6E675F]">
+                <Mail className="w-4 h-4 shrink-0 mt-0.5 text-[#C2501A]" />
+                <span>
+                  Você também receberá uma notificação no seu e-mail{' '}
+                  <strong>{pedidoSuccess.email}</strong>.
+                </span>
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              onClick={() => {
+                setLoginEmail(pedidoSuccess.email)
+                setPedidoSuccess(null)
+                switchMode('login')
+              }}
+              className="w-full h-11 bg-[#C2501A] hover:bg-[#A84415] text-white font-semibold text-sm rounded-xl shadow-sm"
+            >
+              Ir para Tela de Entrada
+            </Button>
+          </div>
+        )}
+
+        {mode === 'register' && !pedidoSuccess && (
           <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
             <div className="space-y-1">
               <Label
@@ -409,9 +486,9 @@ export default function Login() {
             </div>
 
             <p className="text-[11px] text-[#6E675F] leading-tight">
-              Sua conta será criada com perfil de{' '}
-              <strong className="text-[#2E2A25]">Corretor</strong> para acesso imediato ao
-              Simulador, Lotes e Clientes.
+              Ao solicitar o cadastro, o administrador Master receberá a notificação para{' '}
+              <strong className="text-[#2E2A25]">autorizar seu acesso com 1 clique</strong>. Sua
+              senha definida será mantida.
             </p>
 
             <Button
@@ -422,10 +499,10 @@ export default function Login() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Criando conta...
+                  Enviando solicitação...
                 </>
               ) : (
-                'Concluir Cadastro & Entrar'
+                'Solicitar Cadastro & Acesso'
               )}
             </Button>
           </form>
